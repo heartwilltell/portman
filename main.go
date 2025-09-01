@@ -1,42 +1,58 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/heartwilltell/scotty"
 )
 
 func main() {
-	var filterPort uint
-	var filterProcess string
-	var showListenOnly bool
-	var showVersion bool
-	var tuiMode bool
+	var (
+		filterPort     uint
+		filterProcess  string
+		showListenOnly bool
+		hideBorders    bool
+	)
 
 	cmd := scotty.Command{
 		Name:  "wutp",
 		Short: "Who Use This Port - A fast port usage analyzer",
 		Long: `Who Use This Port (wutp) is a fast and colorful command-line tool to discover
 which processes are using specific ports on your system. It provides detailed information
-about port usage including process names, PIDs, connection types, and addresses.
-
-Use --tui flag for an interactive table interface with process management capabilities.`,
+about port usage including process names, PIDs, connection types, and addresses.`,
 		SetFlags: func(flags *scotty.FlagSet) {
 			flags.UintVarE(&filterPort, "port", "", 0, "Filter by specific port number")
 			flags.StringVarE(&filterProcess, "process", "", "", "Filter by process name (case-insensitive partial match)")
 			flags.BoolVarE(&showListenOnly, "listen", "", false, "Show only listening ports")
-			flags.BoolVarE(&showVersion, "version", "", false, "Show version information")
-			flags.BoolVarE(&tuiMode, "tui", "", false, "Launch interactive TUI mode with process management")
+			flags.BoolVarE(&hideBorders, "no-borders", "", false, "Hide table borders for cleaner output")
 		},
 
 		Run: func(cmd *scotty.Command, args []string) error {
-			processes, err := GetProcessInfo()
+			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+			defer stop()
+
+			processManager, err := NewProcessManager(ctx)
 			if err != nil {
-				return err
+				return fmt.Errorf("new process manager: %w", err)
 			}
 
-			RenderProcesses(processes)
+			m := newTableModel(processManager)
+
+			p := tea.NewProgram(m,
+				tea.WithOutput(os.Stdout),
+				tea.WithContext(ctx),
+				tea.WithAltScreen(),
+				tea.WithMouseCellMotion(),
+			)
+
+			if _, err := p.Run(); err != nil {
+				return fmt.Errorf("run program: %w", err)
+			}
 
 			return nil
 		},
