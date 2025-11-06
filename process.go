@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -25,29 +26,38 @@ const (
 
 // Enumerated constants for protocol types and status.
 const (
-	ProtocolTCP  = "TCP"
-	ProtocolUDP  = "UDP"
-	ProtocolAll  = "all"
+	// ProtocolTCP represents the TCP protocol.
+	ProtocolTCP = "TCP"
+	// ProtocolUDP represents the UDP protocol.
+	ProtocolUDP = "UDP"
+	// ProtocolAll represents all protocols.
+	ProtocolAll = "all"
+	// ProtocolTCP4 represents the TCP4 protocol.
 	ProtocolTCP4 = "tcp4"
+	// ProtocolTCP6 represents the TCP6 protocol.
 	ProtocolTCP6 = "tcp6"
+	// ProtocolUDP4 represents the UDP4 protocol.
 	ProtocolUDP4 = "udp4"
+	// ProtocolUDP6 represents the UDP6 protocol.
 	ProtocolUDP6 = "udp6"
 
+	// StatusActive represents an active status.
 	StatusActive = "ACTIVE"
+	// StatusListen represents a listening status.
 	StatusListen = "LISTEN"
+	// StatusClosed represents a closed status.
 	StatusClosed = "CLOSED"
 )
 
 // Process represents a process that is using a port.
 type Process struct {
-	PID        int
-	Name       string
-	Port       int
-	Protocol   string
-	Status     string
-	LocalAddr  string
-	RemoteAddr string
-	Cmdline    string
+	PID       int
+	Name      string
+	Port      int
+	Protocol  string
+	Status    string
+	LocalAddr string
+	Cmdline   string
 }
 
 // Options represents the options for the GetOcupiedPorts function.
@@ -155,6 +165,25 @@ func (m *ProcessManager) Processes(ctx context.Context, options ...Option) ([]Pr
 	}
 
 	return filtered, nil
+}
+
+func (m *ProcessManager) KillProcess(ctx context.Context, pid int) error {
+	proc, err := process.NewProcess(int32(pid))
+	if err != nil {
+		return fmt.Errorf("find process %d: %w", pid, err)
+	}
+
+	if err := proc.Terminate(); err != nil {
+		if err := proc.Kill(); err != nil {
+			return fmt.Errorf("terminate process %d: %w", pid, err)
+		}
+	}
+
+	if err := m.fetchProcesses(ctx, WithFilterProtocol("all")); err != nil && !errors.Is(err, ErrNoConnectionsFound) {
+		return fmt.Errorf("refresh processes: %w", err)
+	}
+
+	return nil
 }
 
 func (m *ProcessManager) monitorProcesses(ctx context.Context) {
@@ -282,13 +311,12 @@ func (m *ProcessManager) fetchProcesses(ctx context.Context, options ...Option) 
 			}
 
 			process := Process{
-				PID:        int(conn.Pid),
-				Name:       name,
-				Port:       int(conn.Laddr.Port),
-				Protocol:   protocol,
-				Status:     status,
-				LocalAddr:  fmt.Sprintf("%s:%d", conn.Laddr.IP, conn.Laddr.Port),
-				RemoteAddr: fmt.Sprintf("%s:%d", conn.Raddr.IP, conn.Raddr.Port),
+				PID:       int(conn.Pid),
+				Name:      name,
+				Port:      int(conn.Laddr.Port),
+				Protocol:  protocol,
+				Status:    status,
+				LocalAddr: fmt.Sprintf("%s:%d", conn.Laddr.IP, conn.Laddr.Port),
 			}
 
 			processes = append(processes, process)

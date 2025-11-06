@@ -11,6 +11,12 @@ import (
 	"github.com/heartwilltell/scotty"
 )
 
+const (
+	cmdName  = "portman"
+	cmdShort = "Portman - Port Usage Analyzer"
+	version  = "0.1.0"
+)
+
 func main() {
 	var (
 		filterPort     uint
@@ -20,11 +26,12 @@ func main() {
 	)
 
 	cmd := scotty.Command{
-		Name:  "wutp",
-		Short: "Who Use This Port - A fast port usage analyzer",
-		Long: `Who Use This Port (wutp) is a fast and colorful command-line tool to discover
-which processes are using specific ports on your system. It provides detailed information
-about port usage including process names, PIDs, connection types, and addresses.`,
+		Name:  cmdName,
+		Short: cmdShort,
+		Long: `Portman is a fast and colorful command-line tool to discover which processes are using specific ports on your system.
+
+It provides detailed information about port usage including process names, PIDs, connection types, and addresses.`,
+
 		SetFlags: func(flags *scotty.FlagSet) {
 			flags.UintVarE(&filterPort, "port", "", 0, "Filter by specific port number")
 			flags.StringVarE(&filterProcess, "process", "", "", "Filter by process name (case-insensitive partial match)")

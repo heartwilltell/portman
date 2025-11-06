@@ -29,7 +29,6 @@ func RenderMarkdownTableForProcesses(processes []Process, hideBorders bool) (str
 			process.Protocol,
 			process.Status,
 			process.LocalAddr,
-			process.RemoteAddr,
 		})
 	}
 
@@ -60,7 +59,6 @@ func renderPlainTextTable(processes []Process) string {
 			process.Protocol,
 			process.Status,
 			process.LocalAddr,
-			process.RemoteAddr,
 		})
 	}
 
@@ -72,6 +70,12 @@ func renderPlainTextTable(processes []Process) string {
 				colWidths[i] = len(cell)
 			}
 		}
+	}
+
+	// Set a maximum width for the Status column (index 4)
+	// The longest status value is "LISTEN" or "ACTIVE" or "CLOSED" (6 chars)
+	if len(colWidths) > 4 && colWidths[4] > 6 {
+		colWidths[4] = 6
 	}
 
 	var result strings.Builder
