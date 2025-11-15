@@ -1,0 +1,96 @@
+# GoReleaser configuration for portman
+# https://goreleaser.com
+
+project_name: portman
+
+# Build configuration
+builds:
+  - id: portman
+    main: .
+    binary: portman
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+
+# Archive configuration
+archives:
+  - id: default
+    builds:
+      - portman
+    format_overrides:
+      - goos: darwin
+        format: zip
+      - goos: linux
+        format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
+    files:
+      - README.md
+      - LICENSE
+
+# Checksums
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+  algorithm: sha256
+
+# GitHub release
+release:
+  github:
+    owner: heartwilltell
+    name: portman
+  mode: replace
+  draft: false
+  prerelease: auto
+
+# Homebrew formula
+brews:
+  - name: portman
+    github:
+      owner: heartwilltell
+      name: homebrew-tap
+    commit_author:
+      name: goreleaserbot
+      email: goreleaser@users.noreply.github.com
+    folder: Formula
+    homepage: "https://github.com/heartwilltell/portman"
+    description: "A fast and colorful command-line tool to discover which processes are using specific ports on your system"
+    license: "MIT"
+    test: |
+      system "#{bin}/portman --version"
+    install: |
+      bin.install "portman"
+    dependencies:
+      - go
+
+# Snapcraft (optional, commented out)
+# snaps:
+#   - name: portman
+#     base: core20
+#     summary: Port Usage Analyzer
+#     description: A fast and colorful command-line tool to discover which processes are using specific ports
+#     grade: stable
+#     confinement: strict
+#     apps:
+#       portman:
+#         command: portman
+#         plugs:
+#           - network
+#           - network-bind
+
+# Changelog
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - Merge pull request
+      - Merge branch
