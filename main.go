@@ -14,6 +14,7 @@ import (
 const (
 	cmdName  = "portman"
 	cmdShort = "Portman - Port Usage Analyzer"
+	cmdLong  = "Portman is a fast and colorful command-line tool to discover which processes are using specific ports on your system."
 	version  = "0.1.0"
 )
 
@@ -28,15 +29,12 @@ func main() {
 	cmd := scotty.Command{
 		Name:  cmdName,
 		Short: cmdShort,
-		Long: `Portman is a fast and colorful command-line tool to discover which processes are using specific ports on your system.
-
-It provides detailed information about port usage including process names, PIDs, connection types, and addresses.`,
-
+		Long:  cmdLong,
 		SetFlags: func(flags *scotty.FlagSet) {
-			flags.UintVarE(&filterPort, "port", "", 0, "Filter by specific port number")
-			flags.StringVarE(&filterProcess, "process", "", "", "Filter by process name (case-insensitive partial match)")
-			flags.BoolVarE(&showListenOnly, "listen", "", false, "Show only listening ports")
-			flags.BoolVarE(&hideBorders, "no-borders", "", false, "Hide table borders for cleaner output")
+			flags.UintVar(&filterPort, "port", 0, "Filter by specific port number")
+			flags.StringVar(&filterProcess, "process", "", "Filter by process name (case-insensitive partial match)")
+			flags.BoolVar(&showListenOnly, "listen", false, "Show only listening ports")
+			flags.BoolVar(&hideBorders, "no-borders", false, "Hide table borders for cleaner output")
 		},
 
 		Run: func(cmd *scotty.Command, args []string) error {
