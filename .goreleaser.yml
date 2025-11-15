@@ -1,7 +1,7 @@
-# GoReleaser configuration for wutp
+# GoReleaser configuration for portman
 # https://goreleaser.com
 
-project_name: wutp
+project_name: portman
 
 # Build configuration
 builds:
@@ -45,14 +45,14 @@ checksum:
 release:
   github:
     owner: heartwilltell
-    name: wutp
+    name: portman
   mode: replace
   draft: false
   prerelease: auto
 
 # Homebrew formula
 brews:
-  - name: wutp
+  - name: portman
     github:
       owner: heartwilltell
       name: homebrew-tap
@@ -60,13 +60,13 @@ brews:
       name: goreleaserbot
       email: goreleaser@users.noreply.github.com
     folder: Formula
-    homepage: "https://github.com/heartwilltell/wutp"
+    homepage: "https://github.com/heartwilltell/portman"
     description: "A fast and colorful command-line tool to discover which processes are using specific ports on your system"
     license: "MIT"
     test: |
-      system "#{bin}/wutp --version"
+      system "#{bin}/portman --version"
     install: |
-      bin.install "portman" => "wutp"
+      bin.install "portman"
     dependencies:
       - go
 
