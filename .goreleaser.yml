@@ -72,7 +72,7 @@ brews:
 
 # Snapcraft (optional, commented out)
 # snaps:
-#   - name: wutp
+#   - name: portman
 #     base: core20
 #     summary: Port Usage Analyzer
 #     description: A fast and colorful command-line tool to discover which processes are using specific ports
