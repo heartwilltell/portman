@@ -63,31 +63,37 @@ Flags:
 ### Examples
 
 #### Show all ports (CLI mode)
+
 ```bash
 wutp
 ```
 
 #### Launch interactive TUI mode
+
 ```bash
 wutp --tui
 ```
 
 #### Show only listening ports
+
 ```bash
 wutp -listen
 ```
 
 #### Find who's using port 8080
+
 ```bash
 wutp -port 8080
 ```
 
 #### Find all Chrome processes using ports
+
 ```bash
 wutp -process chrome
 ```
 
 #### Find listening ports used by Node.js
+
 ```bash
 wutp -listen -process node
 ```
@@ -111,21 +117,22 @@ wutp --tui
 
 ### TUI Keybindings
 
-| Key | Action |
-|-----|---------|
-| `↑/↓` or `j/k` | Navigate table |
-| `Space` | Toggle process selection |
-| `k` | Kill selected processes |
-| `a` | Select all processes |
-| `n` | Select none |
-| `s` | Sort by CPU usage |
-| `r` | Refresh process list |
-| `?/h` | Toggle help |
-| `q` | Quit |
+| Key            | Action                   |
+| -------------- | ------------------------ |
+| `↑/↓` or `j/k` | Navigate table           |
+| `Space`        | Toggle process selection |
+| `k`            | Kill selected processes  |
+| `a`            | Select all processes     |
+| `n`            | Select none              |
+| `s`            | Sort by CPU usage        |
+| `r`            | Refresh process list     |
+| `?/h`          | Toggle help              |
+| `q`            | Quit                     |
 
 ## Sample Output
 
 ### CLI Mode
+
 ```
 Scanning for busy ports and their processes...
 
@@ -140,6 +147,7 @@ PORT     TYPE   STATUS      PID          PROCESS              ADDRESS
 ```
 
 ### TUI Mode
+
 ```
 ┌─ WUTP - Who Use This Port | Processes: 12 | Selected: 2 ─────────────────┐
 │                                                                            │
@@ -168,21 +176,25 @@ PORT     TYPE   STATUS      PID          PROCESS              ADDRESS
 The project includes a build script that supports multiple platforms:
 
 ### Build for current platform
+
 ```bash
 ./build.sh
 ```
 
 ### Build for all platforms
+
 ```bash
 ./build.sh all
 ```
 
 ### Install locally
+
 ```bash
 ./build.sh install
 ```
 
 ### Other build commands
+
 ```bash
 ./build.sh clean    # Clean build artifacts
 ./build.sh test     # Run tests
