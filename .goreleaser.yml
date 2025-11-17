@@ -53,13 +53,13 @@ release:
 # Homebrew formula
 brews:
   - name: portman
-    github:
+    repository:
       owner: heartwilltell
       name: homebrew-tap
     commit_author:
       name: goreleaserbot
       email: goreleaser@users.noreply.github.com
-    folder: Formula
+    directory: Formula
     homepage: "https://github.com/heartwilltell/portman"
     description: "A fast and colorful command-line tool to discover which processes are using specific ports on your system"
     license: "MIT"
