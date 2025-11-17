@@ -1,4 +1,4 @@
-# wutp - Who Use This Port
+# Portman - Port Usage Analyzer
 
 A fast and colorful command-line tool to discover which processes are using specific ports on your system.
 
@@ -29,9 +29,9 @@ go install github.com/heartwilltell/wutp@latest
 ### Build from Source
 
 ```bash
-git clone https://github.com/heartwilltell/wutp.git
-cd wutp
-./build.sh install
+git clone https://github.com/heartwilltell/portman.git
+cd portman
+go build -o portman .
 ```
 
 ## Usage
@@ -41,16 +41,16 @@ cd wutp
 Show all busy ports and their processes:
 
 ```bash
-wutp
+portman
 ```
 
 ### Command Line Options
 
-```
-wutp - Who Use This Port
+```text
+portman - Port Usage Analyzer
 
 Usage:
-  wutp <flags> [arguments...]
+  portman <flags> [arguments...]
 
 Flags:
   -listen bool     Show only listening ports
@@ -62,48 +62,34 @@ Flags:
 
 ### Examples
 
-#### Show all ports (CLI mode)
-
-```bash
-wutp
-```
-
 #### Launch interactive TUI mode
 
 ```bash
-wutp --tui
+portman
 ```
 
 #### Show only listening ports
 
 ```bash
-wutp -listen
+portman -listen
 ```
 
 #### Find who's using port 8080
 
 ```bash
-wutp -port 8080
+portman -port 8080
 ```
 
 #### Find all Chrome processes using ports
 
 ```bash
-wutp -process chrome
+portman -process chrome
 ```
 
 #### Find listening ports used by Node.js
 
 ```bash
-wutp -listen -process node
-```
-
-## Interactive TUI Mode
-
-Launch the interactive table interface with:
-
-```bash
-wutp --tui
+portman -listen -process node
 ```
 
 ### TUI Features
@@ -133,7 +119,7 @@ wutp --tui
 
 ### CLI Mode
 
-```
+```text
 Scanning for busy ports and their processes...
 
 PORT     TYPE   STATUS      PID          PROCESS              ADDRESS
@@ -148,7 +134,7 @@ PORT     TYPE   STATUS      PID          PROCESS              ADDRESS
 
 ### TUI Mode
 
-```
+```text
 ┌─ WUTP - Who Use This Port | Processes: 12 | Selected: 2 ─────────────────┐
 │                                                                            │
 │ ✓  PID    Process          Port  Proto Status     CPU    Memory   Local   │
