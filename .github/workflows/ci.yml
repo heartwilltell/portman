@@ -69,93 +69,19 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     needs: [test, lint]
-    if: github.event_name == 'push' || github.event_name == 'release'
-
-    strategy:
-      matrix:
-        goos: [linux, darwin, windows]
-        goarch: [amd64, arm64]
-        exclude:
-          - goos: windows
-            goarch: arm64
+    if: github.event_name == 'push'
 
     steps:
       - name: Check out code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: 1.25
 
-      - name: Get version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" == "release" ]; then
-            VERSION=${{ github.event.release.tag_name }}
-          else
-            VERSION=$(git describe --tags --always --dirty)
-          fi
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          echo "BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')" >> $GITHUB_OUTPUT
-
       - name: Build binary
-        env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: 0
-        run: |
-          BINARY_NAME=wutp
-          if [ "${{ matrix.goos }}" == "windows" ]; then
-            BINARY_NAME=wutp.exe
-          fi
-
-          LDFLAGS="-s -w -X 'main.Version=${{ steps.version.outputs.VERSION }}' -X 'main.BuildTime=${{ steps.version.outputs.BUILD_TIME }}'"
-
-          go build -ldflags "$LDFLAGS" -o dist/${BINARY_NAME} .
-
-          # Create archive
-          ARCHIVE_NAME=wutp_${{ matrix.goos }}_${{ matrix.goarch }}
-          if [ "${{ matrix.goos }}" == "windows" ]; then
-            zip -j ${ARCHIVE_NAME}.zip dist/${BINARY_NAME} README.md LICENSE
-          else
-            tar -czf ${ARCHIVE_NAME}.tar.gz -C dist ${BINARY_NAME} -C .. README.md LICENSE
-          fi
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: wutp_${{ matrix.goos }}_${{ matrix.goarch }}
-          path: |
-            wutp_${{ matrix.goos }}_${{ matrix.goarch }}.*
-
-  release:
-    name: Release
-    runs-on: ubuntu-latest
-    needs: [build]
-    if: github.event_name == 'release'
-
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: ./artifacts
-
-      - name: Display structure of downloaded files
-        run: ls -la ./artifacts
-
-      - name: Upload release assets
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ./artifacts/**/*
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: go build -o portman .
 
   docker:
     name: Docker
@@ -183,7 +109,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: heartwilltell/wutp
+          images: heartwilltell/portman
           tags: |
             type=ref,event=branch
             type=ref,event=pr
