@@ -18,12 +18,12 @@ A fast and colorful command-line tool to discover which processes are using spec
 
 ### Download Pre-built Binary
 
-Download the latest release from the [releases page](https://github.com/heartwilltell/wutp/releases).
+Download the latest release from the [releases page](https://github.com/heartwilltell/portman/releases).
 
 ### Install via Go
 
 ```bash
-go install github.com/heartwilltell/wutp@latest
+go install github.com/heartwilltell/portman@latest
 ```
 
 ### Build from Source
@@ -135,7 +135,7 @@ PORT     TYPE   STATUS      PID          PROCESS              ADDRESS
 ### TUI Mode
 
 ```
-┌─ WUTP - Who Use This Port | Processes: 12 | Selected: 2 ─────────────────┐
+┌─ Portman - Port Usage Analyzer | Processes: 12 | Selected: 2 ──────────────┐
 │                                                                            │
 │ ✓  PID    Process          Port  Proto Status     CPU    Memory   Local   │
 │ ─  ────   ─────────────────────  ───── ────────── ────── ──────── ─────── │
@@ -190,7 +190,7 @@ The project includes a build script that supports multiple platforms:
 
 ## How It Works
 
-`wutp` uses advanced system analysis to gather comprehensive port and process information:
+`portman` uses advanced system analysis to gather comprehensive port and process information:
 
 1. **System Connection Analysis**: Uses the `gopsutil` library to gather detailed connection information
 2. **Process Monitoring**: Collects real-time CPU and memory statistics for each process
