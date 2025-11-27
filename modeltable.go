@@ -644,7 +644,7 @@ func (m *tableModel) renderStatusBar() string {
 	}
 
 	if m.statusMessage != "" && time.Now().Before(m.statusExpires) {
-		style := statusStyle.Copy()
+		style := statusStyle
 		if m.statusKind == statusKindError {
 			style = style.Foreground(lipgloss.Color("203"))
 		} else {
