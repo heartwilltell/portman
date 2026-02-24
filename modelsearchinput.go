@@ -27,7 +27,7 @@ func newSearchInputModel() *searchInputModel {
 	return &searchInputModel{input: input}
 }
 
-func (m *searchInputModel) Init() tea.Cmd { return textinput.Blink }
+func (*searchInputModel) Init() tea.Cmd { return textinput.Blink }
 
 func (m *searchInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd

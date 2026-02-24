@@ -39,7 +39,7 @@ func RenderMarkdownTableForProcesses(processes []Process, hideBorders bool) (str
 	return byf.String(), nil
 }
 
-// renderPlainTextTable creates a clean table without borders
+// renderPlainTextTable creates a clean table without borders.
 func renderPlainTextTable(processes []Process) string {
 	if len(processes) == 0 {
 		return "No processes found.\n"
@@ -47,7 +47,7 @@ func renderPlainTextTable(processes []Process) string {
 
 	headers := []string{"PID", "PROCESS", "PORT", "PROTOCOL", "STATUS", "LOCAL ADDRESS", "REMOTE ADDRESS"}
 
-	// Collect all data including headers
+	// Collect all data including headers.
 	var allRows [][]string
 	allRows = append(allRows, headers)
 
@@ -62,7 +62,7 @@ func renderPlainTextTable(processes []Process) string {
 		})
 	}
 
-	// Calculate column widths
+	// Calculate column widths.
 	colWidths := make([]int, len(headers))
 	for _, row := range allRows {
 		for i, cell := range row {
@@ -72,26 +72,26 @@ func renderPlainTextTable(processes []Process) string {
 		}
 	}
 
-	// Set a maximum width for the Status column (index 4)
-	// The longest status value is "LISTEN" or "ACTIVE" or "CLOSED" (6 chars)
+	// Set a maximum width for the Status column (index 4).
+	// The longest status value is "LISTEN" or "ACTIVE" or "CLOSED" (6 chars).
 	if len(colWidths) > 4 && colWidths[4] > 6 {
 		colWidths[4] = 6
 	}
 
 	var result strings.Builder
 
-	// Render each row with proper spacing
+	// Render each row with proper spacing.
 	for i, row := range allRows {
 		for j, cell := range row {
-			// Left-align all columns except add padding
-			result.WriteString(fmt.Sprintf("%-*s", colWidths[j], cell))
+			// Left-align all columns except add padding.
+			fmt.Fprintf(&result, "%-*s", colWidths[j], cell)
 			if j < len(row)-1 {
-				result.WriteString("   ") // 3 spaces between columns
+				result.WriteString("   ") // 3 spaces between columns.
 			}
 		}
 		result.WriteString("\n")
 
-		// Add separator after header
+		// Add separator after header.
 		if i == 0 {
 			for j := range row {
 				result.WriteString(strings.Repeat("-", colWidths[j]))

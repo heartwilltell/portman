@@ -40,7 +40,7 @@ func main() {
 			flags.BoolVar(&hideBorders, "no-borders", false, "Hide table borders for cleaner output")
 		},
 
-		Run: func(cmd *scotty.Command, args []string) error {
+		Run: func(_ *scotty.Command, _ []string) error {
 			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
 

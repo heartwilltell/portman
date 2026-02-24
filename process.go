@@ -77,8 +77,8 @@ func WithFilterPort(port uint) Option {
 }
 
 // WithFilterProcess returns an option that filters the processes by process name.
-func WithFilterProcess(process string) Option {
-	return func(o *Options) { o.FilterProcess = process }
+func WithFilterProcess(procName string) Option {
+	return func(o *Options) { o.FilterProcess = procName }
 }
 
 // WithShowListenOnly returns an option that shows only listening ports.
@@ -103,7 +103,7 @@ type ProcessManager struct {
 
 // NewProcessManager creates a new ProcessManager.
 func NewProcessManager(ctx context.Context) (*ProcessManager, error) {
-	ctx, cancel := context.WithCancel(ctx)
+	managerCtx, cancel := context.WithCancel(ctx)
 
 	manager := &ProcessManager{
 		pidIndex:  make(map[int]int),
@@ -113,7 +113,7 @@ func NewProcessManager(ctx context.Context) (*ProcessManager, error) {
 	}
 
 	// Fetch initial data immediately and wait for it to complete.
-	if err := manager.fetchProcesses(ctx, WithFilterProtocol("all")); err != nil {
+	if err := manager.fetchProcesses(managerCtx, WithFilterProtocol("all")); err != nil {
 		manager.mu.Lock()
 		manager.err = fmt.Errorf("initial fetch processes: %w", err)
 		manager.mu.Unlock()
@@ -121,7 +121,7 @@ func NewProcessManager(ctx context.Context) (*ProcessManager, error) {
 	}
 
 	// Start the background monitoring.
-	go manager.monitorProcesses(ctx)
+	go manager.monitorProcesses(managerCtx)
 
 	return manager, nil
 }
@@ -131,7 +131,7 @@ func (m *ProcessManager) Stop() {
 	m.ticker.Stop()
 }
 
-func (m *ProcessManager) Processes(ctx context.Context, options ...Option) ([]Process, error) {
+func (m *ProcessManager) Processes(_ context.Context, options ...Option) ([]Process, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -142,34 +142,34 @@ func (m *ProcessManager) Processes(ctx context.Context, options ...Option) ([]Pr
 
 	filtered := make([]Process, 0, len(m.processes))
 
-	for _, process := range m.processes {
-		if listOptions.FilterProtocol != ProtocolAll && process.Protocol != listOptions.FilterProtocol {
+	for _, proc := range m.processes {
+		if listOptions.FilterProtocol != ProtocolAll && proc.Protocol != listOptions.FilterProtocol {
 			continue
 		}
 
-		if listOptions.FilterPort != 0 && uint(process.Port) != listOptions.FilterPort {
+		if listOptions.FilterPort != 0 && proc.Port >= 0 && uint(proc.Port) != listOptions.FilterPort { // #nosec G115
 			continue
 		}
 
-		if listOptions.ShowListenOnly && process.Status != StatusListen {
+		if listOptions.ShowListenOnly && proc.Status != StatusListen {
 			continue
 		}
 
 		if listOptions.FilterProcess != "" && !strings.Contains(
-			strings.ToLower(process.Name),
+			strings.ToLower(proc.Name),
 			strings.ToLower(listOptions.FilterProcess),
 		) {
 			continue
 		}
 
-		filtered = append(filtered, process)
+		filtered = append(filtered, proc)
 	}
 
 	return filtered, nil
 }
 
 func (m *ProcessManager) KillProcess(ctx context.Context, pid int) error {
-	proc, err := process.NewProcess(int32(pid))
+	proc, err := process.NewProcess(int32(pid)) // #nosec G115
 	if err != nil {
 		return fmt.Errorf("find process %d: %w", pid, err)
 	}
@@ -303,7 +303,8 @@ func (m *ProcessManager) fetchProcesses(ctx context.Context, options ...Option) 
 				continue
 			}
 
-			if listOptions.FilterPort != 0 && uint(conn.Laddr.Port) != listOptions.FilterPort {
+			// #nosec G115
+			if listOptions.FilterPort != 0 && conn.Laddr.Port > 0 && uint(conn.Laddr.Port) != listOptions.FilterPort {
 				continue
 			}
 

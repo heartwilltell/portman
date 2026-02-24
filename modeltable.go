@@ -119,6 +119,15 @@ func (f filterState) activeLabels() []string {
 	return labels
 }
 
+const (
+	minStatusWidth      = 12
+	minLocalAddrWidth   = 18
+	minProcessWidth     = 18
+	defaultStatusWidth  = 15
+	defaultAddrWidth    = 15
+	defaultProcessWidth = 15
+)
+
 type tableModel struct {
 	pm               *ProcessManager
 	table            table.Model
@@ -144,9 +153,9 @@ func newTableModel(pm *ProcessManager) *tableModel {
 		{Title: "PID", Width: 5},
 		{Title: "Protocol", Width: 8},
 		{Title: "Port", Width: 8},
-		{Title: "Status", Width: 15},
-		{Title: "Local Address", Width: 15},
-		{Title: "Process", Width: 15},
+		{Title: "Status", Width: defaultStatusWidth},
+		{Title: "Local Address", Width: defaultAddrWidth},
+		{Title: "Process", Width: defaultProcessWidth},
 	}
 
 	t := table.New(
@@ -156,21 +165,9 @@ func newTableModel(pm *ProcessManager) *tableModel {
 	)
 
 	s := table.DefaultStyles()
-
-	// s.Header = s.Header.
-	// 	BorderStyle(lipgloss.NormalBorder()).
-	// 	BorderForeground(lipgloss.Color("240")).
-	// 	BorderBottom(true).
-	// 	Bold(false)
-
-	// s.Selected = s.Selected.
-	// 	Foreground(lipgloss.Color("229")).
-	// 	Background(lipgloss.Color("57")).
-	// 	Bold(false)
-
 	t.SetStyles(s)
 
-	// Initialize search input
+	// Initialize search input.
 	searchInput := newSearchInputModel()
 
 	m := tableModel{
@@ -206,14 +203,14 @@ func (m *tableModel) updateTableSize() {
 		{title: "PID", min: 6, weight: 0},
 		{title: "Protocol", min: 8, weight: 0},
 		{title: "Port", min: 6, weight: 0},
-		{title: "Status", min: 12, weight: 1},
-		{title: "Local Address", min: 18, weight: 0},
-		{title: "Process", min: 18, weight: 6},
+		{title: "Status", min: minStatusWidth, weight: 1},
+		{title: "Local Address", min: minLocalAddrWidth, weight: 0},
+		{title: "Process", min: minProcessWidth, weight: 6},
 	}
 
 	frameWidth := baseStyle.GetHorizontalFrameSize()
-	// Account for table column spacing (bubble tea table adds spaces between columns)
-	// Approximate: 3 spaces between each column
+	// Account for table column spacing (bubble tea table adds spaces between columns).
+	// Approximate: 3 spaces between each column.
 	columnSpacing := (len(specs) - 1) * 3
 
 	availableWidth := m.width - frameWidth - columnSpacing
@@ -283,7 +280,7 @@ func (m *tableModel) updateTableSize() {
 	m.tableViewWidth = totalWidth + frameWidth + columnSpacing
 }
 
-func (m *tableModel) Init() tea.Cmd {
+func (*tableModel) Init() tea.Cmd {
 	// Start with a tick to refresh the UI periodically.
 	return tea.Tick(time.Millisecond*500, func(t time.Time) tea.Msg {
 		return tickMsg(t)
@@ -306,7 +303,7 @@ func (m *tableModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.horizontalScroll = 0 // Reset horizontal scroll on resize
+		m.horizontalScroll = 0 // Reset horizontal scroll on resize.
 		m.updateTableSize()
 
 	case tea.KeyMsg:
@@ -350,10 +347,12 @@ func (m *tableModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.table.Focus()
 				return m, nil
 			}
-			// Update search input and apply search in real-time
+			// Update search input and apply search in real-time.
 			var updatedModel tea.Model
 			updatedModel, cmd = m.searchInput.Update(msg)
-			m.searchInput = updatedModel.(*searchInputModel)
+			if updated, ok := updatedModel.(*searchInputModel); ok {
+				m.searchInput = updated
+			}
 			m.searchQuery = m.searchInput.Value()
 			return m, cmd
 		}
@@ -431,7 +430,11 @@ func (m *tableModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(
 				tea.Printf("Let's go to %s!", m.table.SelectedRow()[1]),
 			)
+		default:
+			// No action for unhandled keys.
 		}
+	default:
+		// Unknown message type, delegate to table.
 	}
 
 	m.table, cmd = m.table.Update(msg)
@@ -448,24 +451,24 @@ func (m *tableModel) View() string {
 		return fmt.Sprintf("Error: %s", err.Error())
 	}
 
-	// Store all processes for filtering
+	// Store all processes for filtering.
 	m.allProcesses = processes
 
-	// Filter processes based on search query
+	// Filter processes based on search query.
 	filteredProcesses := m.filterProcesses(processes)
 	m.filteredRowCount = len(filteredProcesses)
 
 	rows := make([]table.Row, 0, len(filteredProcesses))
 
-	// Get process column width for scrolling
+	// Get process column width for scrolling.
 	cols := m.table.Columns()
-	processColWidth := 15 // default
+	processColWidth := defaultProcessWidth
 	if len(cols) > 5 {
 		processColWidth = cols[5].Width
 	}
 
 	for _, process := range filteredProcesses {
-		// Apply horizontal scroll to process name
+		// Apply horizontal scroll to process name.
 		processName := scrollText(process.Name, m.horizontalScroll, processColWidth)
 
 		rows = append(rows, table.Row{
@@ -480,7 +483,7 @@ func (m *tableModel) View() string {
 
 	m.table.SetRows(rows)
 
-	// Build the main view
+	// Build the main view.
 	rawTableView := m.table.View()
 	frameWidth := baseStyle.GetHorizontalFrameSize()
 	tableBodyWidth := lipgloss.Width(rawTableView)
@@ -493,7 +496,7 @@ func (m *tableModel) View() string {
 		tableWidth = tableBodyWidth + frameWidth
 	}
 
-	// Ensure table width doesn't exceed terminal width
+	// Ensure table width doesn't exceed terminal width.
 	if m.width > 0 && tableWidth > m.width {
 		tableWidth = m.width
 	}
@@ -537,7 +540,7 @@ func (m *tableModel) View() string {
 
 	mainView := lipgloss.JoinVertical(lipgloss.Left, sections...)
 
-	// Add status bar
+	// Add status bar.
 	statusBar := m.renderStatusBar()
 	inner := lipgloss.JoinVertical(lipgloss.Left, mainView, statusBar)
 	mainView = lipgloss.JoinVertical(lipgloss.Left, "", inner)
@@ -602,12 +605,12 @@ func matchesTokens(process Process, tokens []string) bool {
 
 // scrollText applies horizontal scrolling to text, showing a window of maxWidth characters
 // starting at offset position. Always returns exactly maxWidth characters to prevent wrapping.
-func scrollText(text string, offset int, maxWidth int) string {
+func scrollText(text string, offset, maxWidth int) string {
 	if maxWidth <= 0 {
 		return ""
 	}
 
-	// If text fits, pad it to maxWidth
+	// If text fits, pad it to maxWidth.
 	if len(text) <= maxWidth {
 		if len(text) < maxWidth {
 			return text + strings.Repeat(" ", maxWidth-len(text))
@@ -615,22 +618,23 @@ func scrollText(text string, offset int, maxWidth int) string {
 		return text
 	}
 
-	// Apply offset
-	if offset >= len(text) {
-		offset = len(text) - maxWidth
-		if offset < 0 {
-			offset = 0
+	// Apply offset.
+	pos := offset
+	if pos >= len(text) {
+		pos = len(text) - maxWidth
+		if pos < 0 {
+			pos = 0
 		}
 	}
 
-	end := offset + maxWidth
+	end := pos + maxWidth
 	if end > len(text) {
-		// If we're at the end, show the last maxWidth characters
+		// If we're at the end, show the last maxWidth characters.
 		result := text[len(text)-maxWidth:]
 		return result
 	}
 
-	return text[offset:end]
+	return text[pos:end]
 }
 
 func (m *tableModel) renderStatusBar() string {
@@ -659,24 +663,27 @@ func (m *tableModel) renderStatusBar() string {
 		status += "  |  " + strings.Join(labels, ", ")
 	}
 
-	// Add horizontal scroll position indicator
+	// Add horizontal scroll position indicator.
 	if m.horizontalScroll > 0 {
 		status += fmt.Sprintf("  |  ←→ (%d)", m.horizontalScroll)
 	}
 
-	// Add scroll indicators if there are more rows than visible
+	// Add scroll indicators if there are more rows than visible.
 	tableHeight := m.table.Height()
 	if m.filteredRowCount > tableHeight {
 		cursor := m.table.Cursor()
 
-		// Determine scroll position
+		// Determine scroll position.
 		var scrollIndicator string
-		if cursor > 0 && cursor < m.filteredRowCount-1 {
+		switch {
+		case cursor > 0 && cursor < m.filteredRowCount-1:
 			scrollIndicator = "↑↓"
-		} else if cursor == 0 && m.filteredRowCount > tableHeight {
+		case cursor == 0 && m.filteredRowCount > tableHeight:
 			scrollIndicator = "↓"
-		} else if cursor >= m.filteredRowCount-1 {
+		case cursor >= m.filteredRowCount-1:
 			scrollIndicator = "↑"
+		default:
+			// No scroll indicator needed.
 		}
 
 		if scrollIndicator != "" {
