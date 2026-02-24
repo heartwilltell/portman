@@ -12,11 +12,14 @@ import (
 )
 
 const (
+	appName  = "Portman"
 	cmdName  = "portman"
 	cmdShort = "Portman - Port Usage Analyzer"
 	cmdLong  = "Portman is a fast and colorful command-line tool to discover which processes are using specific ports on your system."
-	version  = "0.1.0"
 )
+
+// Version is set at build time via ldflags; default to dev when unset.
+var Version = "dev"
 
 func main() {
 	var (

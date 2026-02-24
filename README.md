@@ -20,6 +20,14 @@ A fast and colorful command-line tool to discover which processes are using spec
 
 Download the latest release from the [releases page](https://github.com/heartwilltell/portman/releases).
 
+### Install via Homebrew
+
+```bash
+brew install heartwilltell/portman/portman
+# or install the latest main branch build
+brew install --HEAD heartwilltell/portman/portman
+```
+
 ### Install via Go
 
 ```bash

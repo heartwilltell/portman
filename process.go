@@ -117,6 +117,7 @@ func NewProcessManager(ctx context.Context) (*ProcessManager, error) {
 		manager.mu.Lock()
 		manager.err = fmt.Errorf("initial fetch processes: %w", err)
 		manager.mu.Unlock()
+		return nil, manager.err
 	}
 
 	// Start the background monitoring.
@@ -243,7 +244,7 @@ func (m *ProcessManager) fetchProcesses(ctx context.Context, options ...Option) 
 			return ctx.Err()
 
 		default:
-			proc, err := process.NewProcessWithContext(ctx, int32(conn.Pid))
+			proc, err := process.NewProcessWithContext(ctx, conn.Pid)
 			if err != nil {
 				// Skip process that we can't get.
 				continue
@@ -310,7 +311,7 @@ func (m *ProcessManager) fetchProcesses(ctx context.Context, options ...Option) 
 				continue
 			}
 
-			process := Process{
+			procItem := Process{
 				PID:       int(conn.Pid),
 				Name:      name,
 				Port:      int(conn.Laddr.Port),
@@ -319,21 +320,21 @@ func (m *ProcessManager) fetchProcesses(ctx context.Context, options ...Option) 
 				LocalAddr: fmt.Sprintf("%s:%d", conn.Laddr.IP, conn.Laddr.Port),
 			}
 
-			processes = append(processes, process)
+			processes = append(processes, procItem)
 		}
 	}
 
 	m.processes = processes
 	clear(m.pidIndex)
 
-	for i, process := range processes {
-		m.pidIndex[process.PID] = i
+	for i, p := range processes {
+		m.pidIndex[p.PID] = i
 	}
 
 	return nil
 }
 
-func (m *ProcessManager) connections(ctx context.Context, options Options) ([]netutil.ConnectionStat, error) {
+func (*ProcessManager) connections(ctx context.Context, options Options) ([]netutil.ConnectionStat, error) {
 	connections, err := netutil.ConnectionsWithContext(ctx, options.FilterProtocol)
 	if err != nil {
 		return nil, fmt.Errorf("get tcp connections: %w", err)
