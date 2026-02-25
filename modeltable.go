@@ -188,15 +188,56 @@ func (m *tableModel) setStatusMessage(text string, kind statusKind) {
 	m.statusExpires = time.Now().Add(4 * time.Second)
 }
 
+// clampExtraWidth scales extra width by 0.8 and clamps to [0, extraWidth].
+func clampExtraWidth(extra int) int {
+	scaled := int(float64(extra) * 0.8)
+	if scaled < 0 {
+		scaled = 0
+	}
+	if scaled > extra {
+		scaled = extra
+	}
+	return scaled
+}
+
+// columnSpec describes a table column's sizing constraints.
+type columnSpec struct {
+	title  string
+	min    int
+	weight int
+}
+
+// distributeShares distributes extraWidth among specs proportionally by weight,
+// returning per-column share allocations.
+func distributeShares(specs []columnSpec, extraWidth, totalWeight int) []int {
+	shares := make([]int, len(specs))
+
+	if extraWidth <= 0 || totalWeight <= 0 {
+		return shares
+	}
+
+	assigned := 0
+	for i, spec := range specs {
+		share := extraWidth * spec.weight / totalWeight
+		shares[i] = share
+		assigned += share
+	}
+
+	leftover := extraWidth - assigned
+	for i := 0; leftover > 0 && i < len(specs); i++ {
+		if specs[i].weight == 0 {
+			continue
+		}
+		shares[i]++
+		leftover--
+	}
+
+	return shares
+}
+
 func (m *tableModel) updateTableSize() {
 	if m.width <= 0 {
 		return
-	}
-
-	type columnSpec struct {
-		title  string
-		min    int
-		weight int
 	}
 
 	specs := []columnSpec{
@@ -209,8 +250,6 @@ func (m *tableModel) updateTableSize() {
 	}
 
 	frameWidth := baseStyle.GetHorizontalFrameSize()
-	// Account for table column spacing (bubble tea table adds spaces between columns).
-	// Approximate: 3 spaces between each column.
 	columnSpacing := (len(specs) - 1) * 3
 
 	availableWidth := m.width - frameWidth - columnSpacing
@@ -234,35 +273,8 @@ func (m *tableModel) updateTableSize() {
 		extraWidth = 0
 	}
 
-	if extraWidth > 0 {
-		scaled := int(float64(extraWidth) * 0.8)
-		if scaled < 0 {
-			scaled = 0
-		}
-		if scaled > extraWidth {
-			scaled = extraWidth
-		}
-		extraWidth = scaled
-	}
-	shares := make([]int, len(specs))
-
-	if extraWidth > 0 && totalWeight > 0 {
-		assigned := 0
-		for i, spec := range specs {
-			share := extraWidth * spec.weight / totalWeight
-			shares[i] = share
-			assigned += share
-		}
-
-		leftover := extraWidth - assigned
-		for i := 0; leftover > 0 && i < len(specs); i++ {
-			if specs[i].weight == 0 {
-				continue
-			}
-			shares[i]++
-			leftover--
-		}
-	}
+	extraWidth = clampExtraWidth(extraWidth)
+	shares := distributeShares(specs, extraWidth, totalWeight)
 
 	columns := make([]table.Column, len(specs))
 	totalWidth := 0
@@ -290,10 +302,178 @@ func (*tableModel) Init() tea.Cmd {
 // tickMsg is a message that triggers a UI refresh.
 type tickMsg time.Time
 
+// handleConfirmKillKey handles key input while the kill-confirm dialog is active.
+func (m *tableModel) handleConfirmKillKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "y", "enter":
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		pid := m.confirmTarget.PID
+		name := m.confirmTarget.Name
+		m.confirmKill = false
+		defer cancel()
+		if err := m.pm.KillProcess(ctx, pid); err != nil {
+			m.setStatusMessage(fmt.Sprintf("Kill failed: %v", err), statusKindError)
+			return m, nil
+		}
+		if name != "" {
+			m.setStatusMessage(fmt.Sprintf("Killed %s (%d)", name, pid), statusKindInfo)
+		} else {
+			m.setStatusMessage(fmt.Sprintf("Killed PID %d", pid), statusKindInfo)
+		}
+		return m, nil
+	case "n", "esc":
+		m.confirmKill = false
+		m.setStatusMessage("Kill cancelled", statusKindInfo)
+		return m, nil
+	}
+	return nil, nil
+}
+
+// handleSearchKey handles key input while the search bar is active.
+func (m *tableModel) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.showSearch = false
+		m.searchInput.SetValue("")
+		m.searchQuery = ""
+		m.table.Focus()
+		return m, nil
+
+	case "enter":
+		m.showSearch = false
+		m.searchQuery = m.searchInput.Value()
+		m.table.Focus()
+		return m, nil
+	}
+
+	// Update search input and apply search in real-time.
+	updatedModel, cmd := m.searchInput.Update(msg)
+	if updated, ok := updatedModel.(*searchInputModel); ok {
+		m.searchInput = updated
+	}
+	m.searchQuery = m.searchInput.Value()
+	return m, cmd
+}
+
+// handleFilterToggle processes filter toggle keys.
+func (m *tableModel) handleFilterToggle(key string) bool {
+	switch key {
+	case "t":
+		m.filters.toggleTCP()
+		return true
+	case "u":
+		m.filters.toggleUDP()
+		return true
+	case "l":
+		m.filters.toggleListen()
+		return true
+	case "e":
+		m.filters.toggleEstablished()
+		return true
+	case "x":
+		m.filters.clear()
+		return true
+	}
+	return false
+}
+
+// handleKillKey handles the kill process key command.
+func (m *tableModel) handleKillKey() (tea.Model, tea.Cmd) {
+	row := m.table.SelectedRow()
+	if len(row) == 0 {
+		m.setStatusMessage("No process selected", statusKindError)
+		return m, nil
+	}
+	pid, err := strconv.Atoi(row[0])
+	if err != nil {
+		m.setStatusMessage("Invalid PID", statusKindError)
+		return m, nil
+	}
+	target := Process{PID: pid}
+	if len(row) > 5 {
+		target.Name = row[5]
+	}
+	if len(row) > 3 {
+		target.Status = row[3]
+	}
+	if len(row) > 4 {
+		target.LocalAddr = row[4]
+	}
+	m.confirmKill = true
+	m.confirmTarget = target
+	return m, nil
+}
+
+// handleNormalKey handles key input in normal (non-modal) mode.
+func (m *tableModel) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	key := msg.String()
+	if m.handleFilterToggle(key) {
+		return m, nil
+	}
+
+	switch key {
+	case "/":
+		m.showSearch = true
+		m.searchInput.Focus()
+		return m, textinput.Blink
+
+	case "k":
+		return m.handleKillKey()
+
+	case "shift+left":
+		if m.horizontalScroll > 0 {
+			m.horizontalScroll--
+		}
+		return m, nil
+
+	case "shift+right":
+		m.horizontalScroll++
+		return m, nil
+
+	case "esc":
+		if m.horizontalScroll > 0 {
+			m.horizontalScroll = 0
+			return m, nil
+		}
+		if m.table.Focused() {
+			m.table.Blur()
+		} else {
+			m.table.Focus()
+		}
+
+	case "q", "ctrl+c":
+		return m, tea.Quit
+
+	case "enter":
+		return m, tea.Batch(
+			tea.Printf("Let's go to %s!", m.table.SelectedRow()[1]),
+		)
+
+	default:
+		// No action for unhandled keys.
+	}
+	return m, nil
+}
+
+// handleKeyMsg dispatches to sub-handlers based on current mode.
+func (m *tableModel) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.confirmKill {
+		if resModel, cmd := m.handleConfirmKillKey(msg); resModel != nil {
+			return resModel, cmd
+		}
+	}
+
+	if m.showSearch {
+		return m.handleSearchKey(msg)
+	}
+
+	return m.handleNormalKey(msg)
+}
+
 func (m *tableModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
-	switch msg := msg.(type) {
+	switch typedMsg := msg.(type) {
 	case tickMsg:
 		// Return a command to tick again.
 		return m, tea.Tick(time.Millisecond*500, func(t time.Time) tea.Msg {
@@ -301,138 +481,14 @@ func (m *tableModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		})
 
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
+		m.width = typedMsg.Width
+		m.height = typedMsg.Height
 		m.horizontalScroll = 0 // Reset horizontal scroll on resize.
 		m.updateTableSize()
 
 	case tea.KeyMsg:
-		if m.confirmKill {
-			switch msg.String() {
-			case "y", "enter":
-				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-				pid := m.confirmTarget.PID
-				name := m.confirmTarget.Name
-				m.confirmKill = false
-				defer cancel()
-				if err := m.pm.KillProcess(ctx, pid); err != nil {
-					m.setStatusMessage(fmt.Sprintf("Kill failed: %v", err), statusKindError)
-					return m, nil
-				}
-				if name != "" {
-					m.setStatusMessage(fmt.Sprintf("Killed %s (%d)", name, pid), statusKindInfo)
-				} else {
-					m.setStatusMessage(fmt.Sprintf("Killed PID %d", pid), statusKindInfo)
-				}
-				return m, nil
-			case "n", "esc":
-				m.confirmKill = false
-				m.setStatusMessage("Kill cancelled", statusKindInfo)
-				return m, nil
-			}
-		}
+		return m.handleKeyMsg(typedMsg)
 
-		if m.showSearch {
-			switch msg.String() {
-			case "esc":
-				m.showSearch = false
-				m.searchInput.SetValue("")
-				m.searchQuery = ""
-				m.table.Focus()
-				return m, nil
-
-			case "enter":
-				m.showSearch = false
-				m.searchQuery = m.searchInput.Value()
-				m.table.Focus()
-				return m, nil
-			}
-			// Update search input and apply search in real-time.
-			var updatedModel tea.Model
-			updatedModel, cmd = m.searchInput.Update(msg)
-			if updated, ok := updatedModel.(*searchInputModel); ok {
-				m.searchInput = updated
-			}
-			m.searchQuery = m.searchInput.Value()
-			return m, cmd
-		}
-
-		switch msg.String() {
-		case "/":
-			m.showSearch = true
-			m.searchInput.Focus()
-			return m, textinput.Blink
-		case "t":
-			m.filters.toggleTCP()
-			return m, nil
-		case "u":
-			m.filters.toggleUDP()
-			return m, nil
-		case "l":
-			m.filters.toggleListen()
-			return m, nil
-		case "e":
-			m.filters.toggleEstablished()
-			return m, nil
-		case "x":
-			m.filters.clear()
-			return m, nil
-		case "k":
-			row := m.table.SelectedRow()
-			if len(row) == 0 {
-				m.setStatusMessage("No process selected", statusKindError)
-				return m, nil
-			}
-			pid, err := strconv.Atoi(row[0])
-			if err != nil {
-				m.setStatusMessage("Invalid PID", statusKindError)
-				return m, nil
-			}
-			target := Process{PID: pid}
-			if len(row) > 5 {
-				target.Name = row[5]
-			}
-			if len(row) > 3 {
-				target.Status = row[3]
-			}
-			if len(row) > 4 {
-				target.LocalAddr = row[4]
-			}
-			m.confirmKill = true
-			m.confirmTarget = target
-			return m, nil
-
-		case "shift+left":
-			if m.horizontalScroll > 0 {
-				m.horizontalScroll--
-			}
-			return m, nil
-
-		case "shift+right":
-			m.horizontalScroll++
-			return m, nil
-
-		case "esc":
-			if m.horizontalScroll > 0 {
-				m.horizontalScroll = 0
-				return m, nil
-			}
-			if m.table.Focused() {
-				m.table.Blur()
-			} else {
-				m.table.Focus()
-			}
-
-		case "q", "ctrl+c":
-			return m, tea.Quit
-
-		case "enter":
-			return m, tea.Batch(
-				tea.Printf("Let's go to %s!", m.table.SelectedRow()[1]),
-			)
-		default:
-			// No action for unhandled keys.
-		}
 	default:
 		// Unknown message type, delegate to table.
 	}
@@ -458,29 +514,7 @@ func (m *tableModel) View() string {
 	filteredProcesses := m.filterProcesses(processes)
 	m.filteredRowCount = len(filteredProcesses)
 
-	rows := make([]table.Row, 0, len(filteredProcesses))
-
-	// Get process column width for scrolling.
-	cols := m.table.Columns()
-	processColWidth := defaultProcessWidth
-	if len(cols) > 5 {
-		processColWidth = cols[5].Width
-	}
-
-	for _, process := range filteredProcesses {
-		// Apply horizontal scroll to process name.
-		processName := scrollText(process.Name, m.horizontalScroll, processColWidth)
-
-		rows = append(rows, table.Row{
-			strconv.Itoa(process.PID),
-			process.Protocol,
-			strconv.Itoa(process.Port),
-			process.Status,
-			process.LocalAddr,
-			processName,
-		})
-	}
-
+	rows := m.buildTableRows(filteredProcesses)
 	m.table.SetRows(rows)
 
 	// Build the main view.
@@ -502,29 +536,7 @@ func (m *tableModel) View() string {
 	}
 
 	tableView := baseStyle.Width(tableWidth).Render(rawTableView)
-
-	versionLabel := Version
-	if versionLabel == "" {
-		versionLabel = "dev"
-	}
-	if versionLabel != "dev" {
-		if lower := strings.ToLower(versionLabel); !strings.HasPrefix(lower, "v") {
-			versionLabel = "v" + versionLabel
-		}
-	}
-
-	shortcuts := "[/] Search  [t] TCP  [u] UDP  [l] LISTEN  [e] EST  [k] Kill"
-	left := headerLeftStyle.Render(fmt.Sprintf("%s %s", appName, versionLabel))
-	leftWidth := lipgloss.Width(left)
-	rightSpace := tableWidth - leftWidth
-	if rightSpace < 0 {
-		rightSpace = 0
-	}
-	rightRaw := headerRightStyle.Render(shortcuts)
-	rightTrimmed := lipgloss.NewStyle().MaxWidth(rightSpace).Render(rightRaw)
-	right := lipgloss.PlaceHorizontal(rightSpace, lipgloss.Right, rightTrimmed)
-	headerView := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
-	headerView = lipgloss.NewStyle().MaxWidth(tableWidth).Render(headerView)
+	headerView := buildHeaderView(tableWidth)
 
 	sections := []string{headerView}
 	if m.showSearch {
@@ -546,6 +558,61 @@ func (m *tableModel) View() string {
 	mainView = lipgloss.JoinVertical(lipgloss.Left, "", inner)
 
 	return mainView
+}
+
+// buildTableRows constructs the table.Row slice for the given processes,
+// applying horizontal scroll to the process name column.
+func (m *tableModel) buildTableRows(processes []Process) []table.Row {
+	rows := make([]table.Row, 0, len(processes))
+
+	// Get process column width for scrolling.
+	cols := m.table.Columns()
+	processColWidth := defaultProcessWidth
+	if len(cols) > 5 {
+		processColWidth = cols[5].Width
+	}
+
+	for _, process := range processes {
+		// Apply horizontal scroll to process name.
+		processName := scrollText(process.Name, m.horizontalScroll, processColWidth)
+
+		rows = append(rows, table.Row{
+			strconv.Itoa(process.PID),
+			process.Protocol,
+			strconv.Itoa(process.Port),
+			process.Status,
+			process.LocalAddr,
+			processName,
+		})
+	}
+
+	return rows
+}
+
+// buildHeaderView renders the top header bar (app name + shortcut hints) at the given width.
+func buildHeaderView(tableWidth int) string {
+	versionLabel := Version
+	if versionLabel == "" {
+		versionLabel = "dev"
+	}
+	if versionLabel != "dev" {
+		if lower := strings.ToLower(versionLabel); !strings.HasPrefix(lower, "v") {
+			versionLabel = "v" + versionLabel
+		}
+	}
+
+	shortcuts := "[/] Search  [t] TCP  [u] UDP  [l] LISTEN  [e] EST  [k] Kill"
+	left := headerLeftStyle.Render(fmt.Sprintf("%s %s", appName, versionLabel))
+	leftWidth := lipgloss.Width(left)
+	rightSpace := tableWidth - leftWidth
+	if rightSpace < 0 {
+		rightSpace = 0
+	}
+	rightRaw := headerRightStyle.Render(shortcuts)
+	rightTrimmed := lipgloss.NewStyle().MaxWidth(rightSpace).Render(rightRaw)
+	right := lipgloss.PlaceHorizontal(rightSpace, lipgloss.Right, rightTrimmed)
+	headerView := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
+	return lipgloss.NewStyle().MaxWidth(tableWidth).Render(headerView)
 }
 
 func (m *tableModel) filterProcesses(processes []Process) []Process {

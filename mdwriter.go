@@ -9,11 +9,7 @@ import (
 	md "github.com/nao1215/markdown"
 )
 
-func RenderMarkdownTableForProcesses(processes []Process, hideBorders bool) (string, error) {
-	if hideBorders {
-		return renderPlainTextTable(processes), nil
-	}
-
+func RenderMarkdownTable(processes []Process) (string, error) {
 	var byf bytes.Buffer
 	doc := md.NewMarkdown(&byf)
 	table := md.TableSet{
@@ -39,8 +35,13 @@ func RenderMarkdownTableForProcesses(processes []Process, hideBorders bool) (str
 	return byf.String(), nil
 }
 
-// renderPlainTextTable creates a clean table without borders.
-func renderPlainTextTable(processes []Process) string {
+// RenderPlainTextTable returns a formatted plain text table without borders.
+func RenderPlainTextTable(processes []Process) string {
+	return plainTextTable(processes)
+}
+
+// plainTextTable creates a clean table without borders.
+func plainTextTable(processes []Process) string {
 	if len(processes) == 0 {
 		return "No processes found.\n"
 	}

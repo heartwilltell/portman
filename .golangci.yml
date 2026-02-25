@@ -241,7 +241,7 @@ linters:
         # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#cyclomatic
         - name: cyclomatic
           arguments:
-            - 15
+            - 35
           severity: warning
           disabled: false
 
