@@ -44,6 +44,13 @@ type statusKind int
 const (
 	statusKindInfo statusKind = iota
 	statusKindError
+
+	// reservedUILinesWithSearch is the space reserved for UI overhead when search is open.
+	// This accounts for: blank line, header, search box, status bar, padding.
+	reservedUILinesWithSearch = 11
+	// reservedUILinesWithoutSearch is the space reserved for UI overhead when search is closed.
+	// This accounts for: blank line, header, status bar, padding.
+	reservedUILinesWithoutSearch = 8
 )
 
 func (f *filterState) toggleTCP() {
@@ -89,12 +96,15 @@ func (f filterState) allows(p Process) bool {
 	if f.tcpOnly && !strings.HasPrefix(protocol, "TCP") {
 		return false
 	}
+
 	if f.udpOnly && !strings.HasPrefix(protocol, "UDP") {
 		return false
 	}
+
 	if f.listenOnly && status != "LISTEN" {
 		return false
 	}
+
 	if f.establishedOnly && status != "ESTABLISHED" {
 		return false
 	}
@@ -161,7 +171,7 @@ func newTableModel(pm *ProcessManager) *tableModel {
 	t := table.New(
 		table.WithColumns(columns),
 		table.WithFocused(true),
-		table.WithHeight(10),
+		table.WithHeight(1),
 	)
 
 	s := table.DefaultStyles()
@@ -186,6 +196,26 @@ func (m *tableModel) setStatusMessage(text string, kind statusKind) {
 	m.statusMessage = text
 	m.statusKind = kind
 	m.statusExpires = time.Now().Add(4 * time.Second)
+}
+
+func (m *tableModel) updateTableHeight() {
+	if m.height <= 0 {
+		return
+	}
+
+	reservedLines := reservedUILinesWithoutSearch
+	if m.showSearch {
+		reservedLines = reservedUILinesWithSearch
+	}
+
+	availableHeight := m.height - reservedLines
+
+	// Ensure minimum height of 1.
+	if availableHeight < 1 {
+		availableHeight = 1
+	}
+
+	m.table.SetHeight(availableHeight)
 }
 
 // clampExtraWidth scales extra width by 0.8 and clamps to [0, extraWidth].
@@ -334,6 +364,7 @@ func (m *tableModel) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		m.showSearch = false
+		m.updateTableHeight()
 		m.searchInput.SetValue("")
 		m.searchQuery = ""
 		m.table.Focus()
@@ -341,6 +372,7 @@ func (m *tableModel) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "enter":
 		m.showSearch = false
+		m.updateTableHeight()
 		m.searchQuery = m.searchInput.Value()
 		m.table.Focus()
 		return m, nil
@@ -414,6 +446,7 @@ func (m *tableModel) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch key {
 	case "/":
 		m.showSearch = true
+		m.updateTableHeight()
 		m.searchInput.Focus()
 		return m, textinput.Blink
 
@@ -440,19 +473,24 @@ func (m *tableModel) handleNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			m.table.Focus()
 		}
+		return m, nil
 
 	case "q", "ctrl+c":
 		return m, tea.Quit
 
 	case "enter":
-		return m, tea.Batch(
-			tea.Printf("Let's go to %s!", m.table.SelectedRow()[1]),
-		)
+		row := m.table.SelectedRow()
+		if len(row) > 1 {
+			return m, tea.Batch(
+				tea.Printf("Let's go to %s!", row[1]),
+			)
+		}
+		return m, nil
 
 	default:
-		// No action for unhandled keys.
+		// Unhandled keys should be passed to the table for navigation.
+		return nil, nil
 	}
-	return m, nil
 }
 
 // handleKeyMsg dispatches to sub-handlers based on current mode.
@@ -485,9 +523,13 @@ func (m *tableModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = typedMsg.Height
 		m.horizontalScroll = 0 // Reset horizontal scroll on resize.
 		m.updateTableSize()
+		m.updateTableHeight()
 
 	case tea.KeyMsg:
-		return m.handleKeyMsg(typedMsg)
+		resModel, resCmd := m.handleKeyMsg(typedMsg)
+		if resModel != nil {
+			return resModel, resCmd
+		}
 
 	default:
 		// Unknown message type, delegate to table.
