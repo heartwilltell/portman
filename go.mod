@@ -1,11 +1,11 @@
 module github.com/heartwilltell/portman
 
-go 1.24.6
+go 1.26
 
 require (
 	github.com/charmbracelet/bubbles v1.0.0
 	github.com/charmbracelet/lipgloss v1.1.1-0.20251103205207-7d1b622c64d1
-	github.com/heartwilltell/scotty v0.2.1
+	github.com/heartwilltell/scotty v0.3.1
 	github.com/nao1215/markdown v0.13.0
 )
 
